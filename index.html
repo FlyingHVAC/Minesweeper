@@ -1,6 +1,6 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
-<head>
+<head><meta name="ms-sp-authoring-source" content="agent">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="A self-contained, offline Minesweeper game inspired by the classic Windows version.">
@@ -208,8 +208,9 @@
     .n7 { color: #000000; }
     .n8 { color: #808080; }
 
+    .game-stats { margin: 9px 2px 2px; font: bold 12px/1.5 Arial,sans-serif; text-align:center; }
     .instructions {
-      margin: 7px 2px 1px;
+      margin: 5px 2px 1px;
       font: 12px/1.35 Arial, sans-serif;
       color: #222;
       text-align: center;
@@ -252,6 +253,7 @@
         <div class="board" id="board" role="grid" aria-label="Minesweeper board"></div>
       </div>
 
+      <div class="game-stats" id="gameStats" aria-live="polite"></div>
       <p class="instructions">
         Click/tap to reveal. Right-click or press and hold to flag. Double-click a revealed number on a computer,
         or double-tap it on a phone, to clear its unflagged neighbors when the adjacent flag count matches.
@@ -276,6 +278,19 @@
       const difficultyEl = document.getElementById("difficulty");
       const newGameEl = document.getElementById("newGame");
       const titleResetEl = document.getElementById("titleReset");
+      const gameStatsEl = document.getElementById("gameStats");
+      const MS_SETTINGS_KEY = "classicMinesweeper.settings.v1";
+      const MS_STATS_KEY = "classicMinesweeper.stats.v1";
+      const defaultStats = () => ({ beginner:{wins:0,losses:0,best:null}, intermediate:{wins:0,losses:0,best:null}, expert:{wins:0,losses:0,best:null} });
+      function getStorage(){try{return window.localStorage}catch{return null}}
+      function readJSON(key,fallback){try{const storage=getStorage();return storage?JSON.parse(storage.getItem(key))||fallback:fallback}catch{return fallback}}
+      let allStats = readJSON(MS_STATS_KEY, defaultStats());
+      const savedDifficulty = readJSON(MS_SETTINGS_KEY, {}).difficulty;
+      if (LEVELS[savedDifficulty]) difficultyEl.value = savedDifficulty;
+      function saveSetting(){try{const storage=getStorage();if(storage)storage.setItem(MS_SETTINGS_KEY,JSON.stringify({difficulty:difficultyEl.value}))}catch{}}
+      function saveStats(){try{const storage=getStorage();if(storage)storage.setItem(MS_STATS_KEY,JSON.stringify(allStats))}catch{}}
+      function showStats(){const st=allStats[difficultyEl.value]||defaultStats()[difficultyEl.value];gameStatsEl.textContent=`${difficultyEl.options[difficultyEl.selectedIndex].text.split(":")[0]} stats: Wins ${st.wins} | Losses ${st.losses} | Best ${st.best===null?"--":st.best+"s"}`}
+      function recordAbandon(){if(started&&!ended){allStats[difficultyEl.value].losses++;saveStats()}}
 
       let config;
       let cells = [];
@@ -291,7 +306,9 @@
       let lastTouchTapCell = null;
       const TOUCH_DOUBLE_TAP_MS = 380;
 
-      function beginGame() {
+      function beginGame(countAbandon = false) {
+        if (countAbandon) recordAbandon();
+        saveSetting();
         clearInterval(timerId);
         timerId = null;
         config = LEVELS[difficultyEl.value];
@@ -326,6 +343,7 @@
           }
         }
         updateMineCounter();
+        showStats();
       }
 
       function startTimer() {
@@ -466,6 +484,7 @@
 
       function winGame() {
         ended = true;
+        const st=allStats[difficultyEl.value];st.wins++;if(st.best===null||seconds<st.best)st.best=seconds;saveStats();showStats();
         clearInterval(timerId);
         faceEl.textContent = "😎";
         for (const row of cells) {
@@ -483,6 +502,7 @@
 
       function loseGame() {
         ended = true;
+        allStats[difficultyEl.value].losses++;saveStats();showStats();
         clearInterval(timerId);
         faceEl.textContent = "😵";
         for (const row of cells) {
@@ -575,10 +595,10 @@
         if (!ended) faceEl.textContent = "🙂";
       });
 
-      difficultyEl.addEventListener("change", beginGame);
-      newGameEl.addEventListener("click", beginGame);
-      faceEl.addEventListener("click", beginGame);
-      titleResetEl.addEventListener("click", beginGame);
+      difficultyEl.addEventListener("change", () => beginGame(true));
+      newGameEl.addEventListener("click", () => beginGame(true));
+      faceEl.addEventListener("click", () => beginGame(true));
+      titleResetEl.addEventListener("click", () => beginGame(true));
 
       beginGame();
     })();
