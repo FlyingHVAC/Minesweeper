@@ -252,8 +252,8 @@
       </div>
 
       <p class="instructions">
-        Left-click/tap to reveal. Right-click to flag. On touchscreens, press and hold to flag.
-        Reveal all safe squares to win.
+        Left-click/tap to reveal. Right-click to flag. Double-click a revealed number to clear
+        its unflagged neighbors when the adjacent flag count matches. On touchscreens, press and hold to flag.
       </p>
     </section>
   </main>
@@ -417,6 +417,28 @@
         if (revealedCount === config.rows * config.cols - config.mines) winGame();
       }
 
+      function chordReveal(cell) {
+        if (ended || !cell.revealed || cell.adjacent === 0) return;
+
+        const neighbors = [];
+        let flaggedNeighbors = 0;
+
+        forEachNeighbor(cell.row, cell.col, (r, c) => {
+          const neighbor = cells[r][c];
+          neighbors.push(neighbor);
+          if (neighbor.flagged) flaggedNeighbors++;
+        });
+
+        if (flaggedNeighbors !== cell.adjacent) return;
+
+        // Matching the number is enough to open every unflagged neighbor.
+        // If a flag is misplaced, an unflagged mine may be opened and the game is lost.
+        for (const neighbor of neighbors) {
+          if (ended) break;
+          if (!neighbor.flagged && !neighbor.revealed) reveal(neighbor);
+        }
+      }
+
       function toggleFlag(cell) {
         if (ended || cell.revealed) return;
         if (!cell.flagged && flags >= config.mines) return;
@@ -485,6 +507,13 @@
           return;
         }
         reveal(cell);
+      });
+
+      boardEl.addEventListener("dblclick", event => {
+        const cell = getCellFromEvent(event);
+        if (!cell) return;
+        event.preventDefault();
+        chordReveal(cell);
       });
 
       boardEl.addEventListener("contextmenu", event => {
