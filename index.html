@@ -159,7 +159,8 @@
       border-right: 3px solid var(--light);
       border-bottom: 3px solid var(--light);
       background: var(--mid);
-      touch-action: manipulation;
+      touch-action: pan-x pan-y;
+      -webkit-touch-callout: none;
     }
 
     .board {
@@ -252,8 +253,8 @@
       </div>
 
       <p class="instructions">
-        Left-click/tap to reveal. Right-click to flag. Double-click a revealed number to clear
-        its unflagged neighbors when the adjacent flag count matches. On touchscreens, press and hold to flag.
+        Click/tap to reveal. Right-click or press and hold to flag. Double-click a revealed number on a computer,
+        or double-tap it on a phone, to clear its unflagged neighbors when the adjacent flag count matches.
       </p>
     </section>
   </main>
@@ -286,6 +287,9 @@
       let timerId = null;
       let pressTimer = null;
       let longPressTriggered = false;
+      let lastTouchTapTime = 0;
+      let lastTouchTapCell = null;
+      const TOUCH_DOUBLE_TAP_MS = 380;
 
       function beginGame() {
         clearInterval(timerId);
@@ -507,6 +511,28 @@
           return;
         }
         reveal(cell);
+      });
+
+      // iPhone/iPad: recognize two quick taps on the same revealed number.
+      // Native dblclick is preserved below for mouse/trackpad use.
+      boardEl.addEventListener("pointerup", event => {
+        if (event.pointerType === "mouse" || longPressTriggered) return;
+        const cell = getCellFromEvent(event);
+        if (!cell || !cell.revealed || cell.adjacent === 0) {
+          lastTouchTapCell = null;
+          lastTouchTapTime = 0;
+          return;
+        }
+        const now = performance.now();
+        if (lastTouchTapCell === cell && now - lastTouchTapTime <= TOUCH_DOUBLE_TAP_MS) {
+          event.preventDefault();
+          chordReveal(cell);
+          lastTouchTapCell = null;
+          lastTouchTapTime = 0;
+        } else {
+          lastTouchTapCell = cell;
+          lastTouchTapTime = now;
+        }
       });
 
       boardEl.addEventListener("dblclick", event => {
